@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: marketmind-postgres
+    environment:
+      POSTGRES_DB: marketmind
+      POSTGRES_USER: marketmind
+      POSTGRES_PASSWORD: marketmind
+    ports:
+      # 5433 so it does not clash with the bankapp database on 5432
+      - "5433:5432"
+    volumes:
+      - marketmind-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketmind"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  marketmind-data:

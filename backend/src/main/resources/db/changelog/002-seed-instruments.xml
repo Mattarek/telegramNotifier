@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Starter watchlist. Everything here can be edited later from the "Instrumenty" tab. -->
+    <changeSet id="002-seed-benchmarks" author="marketmind">
+        <insert tableName="instrument">
+            <column name="symbol" value="WIG20"/>
+            <column name="name" value="WIG20"/>
+            <column name="market" value="GPW"/>
+            <column name="type" value="INDEX"/>
+            <column name="currency" value="PLN"/>
+            <column name="yahoo_symbol" value="WIG20.WA"/>
+            <column name="analyzed" valueBoolean="false"/>
+        </insert>
+        <insert tableName="instrument">
+            <column name="symbol" value="SPX"/>
+            <column name="name" value="S&amp;P 500"/>
+            <column name="market" value="US"/>
+            <column name="type" value="INDEX"/>
+            <column name="currency" value="USD"/>
+            <column name="yahoo_symbol" value="^GSPC"/>
+            <column name="analyzed" valueBoolean="false"/>
+        </insert>
+    </changeSet>
+
+    <changeSet id="002-seed-watchlist" author="marketmind">
+        <insert tableName="instrument">
+            <column name="symbol" value="CBF"/>
+            <column name="name" value="cyber_Folks"/>
+            <column name="market" value="GPW"/>
+            <column name="type" value="STOCK"/>
+            <column name="currency" value="PLN"/>
+            <column name="yahoo_symbol" value="CBF.WA"/>
+            <column name="news_query" value="cyber_Folks"/>
+            <column name="benchmark_id" valueComputed="(select id from instrument where symbol = 'WIG20')"/>
+            <column name="trading_enabled" valueBoolean="true"/>
+        </insert>
+        <insert tableName="instrument">
+            <column name="symbol" value="ACP"/>
+            <column name="name" value="Asseco Poland"/>
+            <column name="market" value="GPW"/>
+            <column name="type" value="STOCK"/>
+            <column name="currency" value="PLN"/>
+            <column name="yahoo_symbol" value="ACP.WA"/>
+            <column name="news_query" value="Asseco Poland"/>
+            <column name="benchmark_id" valueComputed="(select id from instrument where symbol = 'WIG20')"/>
+        </insert>
+        <insert tableName="instrument">
+            <column name="symbol" value="NVDA"/>
+            <column name="name" value="NVIDIA"/>
+            <column name="market" value="US"/>
+            <column name="type" value="STOCK"/>
+            <column name="currency" value="USD"/>
+            <column name="yahoo_symbol" value="NVDA"/>
+            <column name="news_query" value="Nvidia stock"/>
+            <column name="benchmark_id" valueComputed="(select id from instrument where symbol = 'SPX')"/>
+            <column name="trading_enabled" valueBoolean="true"/>
+        </insert>
+        <insert tableName="instrument">
+            <column name="symbol" value="SXR8"/>
+            <column name="name" value="iShares Core S&amp;P 500 (Xetra, EUR)"/>
+            <column name="market" value="US"/>
+            <column name="type" value="ETF"/>
+            <column name="currency" value="EUR"/>
+            <column name="yahoo_symbol" value="SXR8.DE"/>
+            <column name="news_query" value="S&amp;P 500"/>
+            <column name="benchmark_id" valueComputed="(select id from instrument where symbol = 'SPX')"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

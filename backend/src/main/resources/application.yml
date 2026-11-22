@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: marketmind
+  datasource:
+    url: jdbc:postgresql://localhost:5433/marketmind
+    username: marketmind
+    password: marketmind
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  ai:
+    # Read from the environment - never commit the key
+    api-key: ${ANTHROPIC_API_KEY:}
+    base-url: https://api.anthropic.com
+    model: claude-sonnet-5-5
+    max-tokens: 4000
+    # Rough USD prices per 1M tokens, only used to show an estimated cost in the UI
+    input-price-per-mtok: 3.0
+    output-price-per-mtok: 15.0
+  market:
+    # How many days of daily bars to fetch on every sync (Yahoo "range" parameter)
+    history-range: 2y
+    user-agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+  news:
+    max-items-per-feed: 15
+    # News older than this is not given to the AI
+    lookback-hours: 72
+    # Feeds not tied to a single instrument (macro / market-wide)
+    general-feeds:
+      - name: "Google News - GPW"
+        url: "https://news.google.com/rss/search?q=GPW+gie%C5%82da+akcje&hl=pl&gl=PL&ceid=PL:pl"
+      - name: "Google News - Wall Street"
+        url: "https://news.google.com/rss/search?q=stock+market+wall+street&hl=en-US&gl=US&ceid=US:en"
+  pipeline:
+    # Daily run after the US close (22:00 Warsaw time). Mon-Fri only.
+    cron: "0 30 22 * * MON-FRI"
+    zone: Europe/Warsaw
+    enabled: true
+  scoring:
+    # A move smaller than this (in %) counts as FLAT for the given horizon (in trading days)
+    flat-band-pct:
+      "1": 0.5
+      "5": 1.0
+      "20": 2.0

@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Instruments we follow. Benchmarks are instruments too (analyzed = false). -->
+    <changeSet id="001-instrument" author="marketmind">
+        <createTable tableName="instrument">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="symbol" type="varchar(32)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="name" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="market" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="varchar(8)"/>
+            <column name="yahoo_symbol" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="news_query" type="varchar(200)"/>
+            <column name="benchmark_id" type="bigint">
+                <constraints foreignKeyName="fk_instrument_benchmark" references="instrument(id)"/>
+            </column>
+            <column name="analyzed" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trading_enabled" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Daily OHLCV bars -->
+    <changeSet id="001-price-bar" author="marketmind">
+        <createTable tableName="price_bar">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="instrument_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_price_bar_instrument" references="instrument(id)"/>
+            </column>
+            <column name="bar_date" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="open" type="double precision"/>
+            <column name="high" type="double precision"/>
+            <column name="low" type="double precision"/>
+            <column name="close" type="double precision">
+                <constraints nullable="false"/>
+            </column>
+            <column name="volume" type="bigint"/>
+        </createTable>
+        <addUniqueConstraint tableName="price_bar" columnNames="instrument_id, bar_date"
+                             constraintName="uq_price_bar_instrument_date"/>
+    </changeSet>
+
+    <changeSet id="001-news-item" author="marketmind">
+        <createTable tableName="news_item">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <!-- null = general market news -->
+            <column name="instrument_id" type="bigint">
+                <constraints foreignKeyName="fk_news_instrument" references="instrument(id)"/>
+            </column>
+            <column name="title" type="varchar(1000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="url" type="varchar(2000)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="source" type="varchar(200)"/>
+            <column name="feed_name" type="varchar(200)"/>
+            <column name="published_at" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="fetched_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="news_item" indexName="ix_news_instrument_published">
+            <column name="instrument_id"/>
+            <column name="published_at"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- One AI (or baseline) analysis per instrument, mode and trading day -->
+    <changeSet id="001-analysis-report" author="marketmind">
+        <createTable tableName="analysis_report">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="instrument_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_report_instrument" references="instrument(id)"/>
+            </column>
+            <column name="mode" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reference_date" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="summary" type="text"/>
+            <column name="sentiment" type="double precision"/>
+            <column name="key_factors_json" type="text"/>
+            <column name="risks_json" type="text"/>
+            <column name="invalidation" type="text"/>
+            <column name="trade_bias" type="varchar(16)"/>
+            <column name="setup_type" type="varchar(100)"/>
+            <column name="entry_price" type="double precision"/>
+            <column name="stop_price" type="double precision"/>
+            <column name="target_price" type="double precision"/>
+            <column name="model" type="varchar(100)"/>
+            <column name="input_tokens" type="int"/>
+            <column name="output_tokens" type="int"/>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="analysis_report"
+                             columnNames="instrument_id, mode, source, reference_date"
+                             constraintName="uq_report_instrument_mode_source_date"/>
+    </changeSet>
+
+    <!-- A single, checkable claim with horizon and confidence -->
+    <changeSet id="001-prediction" author="marketmind">
+        <createTable tableName="prediction">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="instrument_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_prediction_instrument" references="instrument(id)"/>
+            </column>
+            <column name="report_id" type="bigint">
+                <constraints foreignKeyName="fk_prediction_report" references="analysis_report(id)"/>
+            </column>
+            <column name="mode" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="horizon_days" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="direction" type="varchar(8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expected_return_pct" type="double precision"/>
+            <column name="confidence" type="double precision">
+                <constraints nullable="false"/>
+            </column>
+            <column name="rationale" type="text"/>
+            <column name="lessons_used_json" type="text"/>
+            <column name="reference_date" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reference_price" type="double precision">
+                <constraints nullable="false"/>
+            </column>
+            <column name="benchmark_reference_price" type="double precision"/>
+            <column name="entry_price" type="double precision"/>
+            <column name="stop_price" type="double precision"/>
+            <column name="target_price" type="double precision"/>
+            <column name="status" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="resolved_date" type="date"/>
+            <column name="resolved_price" type="double precision"/>
+            <column name="benchmark_resolved_price" type="double precision"/>
+            <column name="actual_return_pct" type="double precision"/>
+            <column name="benchmark_return_pct" type="double precision"/>
+            <column name="measured_return_pct" type="double precision"/>
+            <column name="hit" type="boolean"/>
+            <column name="brier" type="double precision"/>
+            <column name="trade_outcome" type="varchar(16)"/>
+            <column name="r_multiple" type="double precision"/>
+            <column name="reviewed" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="prediction" indexName="ix_prediction_status">
+            <column name="status"/>
+        </createIndex>
+        <createIndex tableName="prediction" indexName="ix_prediction_instrument">
+            <column name="instrument_id"/>
+            <column name="reference_date"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- AI post-mortem of a resolved prediction -->
+    <changeSet id="001-prediction-review" author="marketmind">
+        <createTable tableName="prediction_review">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="prediction_id" type="bigint">
+                <constraints nullable="false" unique="true" foreignKeyName="fk_review_prediction" references="prediction(id)"/>
+            </column>
+            <column name="verdict" type="varchar(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="explanation" type="text"/>
+            <column name="actual_driver" type="text"/>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Long-term memory: lessons that must earn their place with evidence -->
+    <changeSet id="001-lesson" author="marketmind">
+        <createTable tableName="lesson">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="text" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="category" type="varchar(100)"/>
+            <column name="scope" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="scope_ref" type="varchar(32)"/>
+            <column name="mode" type="varchar(16)"/>
+            <column name="status" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="support_count" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="contradict_count" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createTable tableName="lesson_evidence">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="lesson_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_evidence_lesson" references="lesson(id)"/>
+            </column>
+            <column name="prediction_id" type="bigint">
+                <constraints foreignKeyName="fk_evidence_prediction" references="prediction(id)"/>
+            </column>
+            <column name="kind" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="note" type="text"/>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-pipeline-run" author="marketmind">
+        <createTable tableName="pipeline_run">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="trigger_type" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="started_at" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="finished_at" type="timestamptz"/>
+            <column name="log" type="text"/>
+            <column name="input_tokens" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="output_tokens" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>
